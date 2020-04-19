@@ -3,3 +3,4 @@ __pycache__
 secrets.py
 settings.cfg
 *.pdf
+*_cache.json
