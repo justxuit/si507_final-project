@@ -107,8 +107,10 @@ def make_request_twitter_with_cache(baseurl, params):
     url = construct_unique_key(baseurl, params)
     # Check cache
     if url in CACHEDICT_TWITTER.keys():
+        print('Using cache...')
         twitter_data = CACHEDICT_TWITTER[url]
     else:
+        print('Fetching from API. This may take a moment...')
         twitter_data = make_request_twitter(baseurl, params)
         CACHEDICT_TWITTER[url] = twitter_data
         save_cache('twitter', CACHEDICT_TWITTER)
@@ -137,8 +139,10 @@ def make_request_pd_with_cache(api, text):
     unique_key = construct_unique_key(api, text)
     # Check cache
     if unique_key in CACHEDICT_PD.keys():
+        print('Using cache...')
         pd_data = CACHEDICT_PD[unique_key]
     else:
+        print('Fetching from API. This may take a moment...')
         pd_data = make_request_pd(api, text)
         CACHEDICT_PD[unique_key] = pd_data
         save_cache('pd', CACHEDICT_PD)
@@ -197,16 +201,16 @@ def make_request_reddit():
 
 
 if __name__ == "__main__":
-    params = {"screen_name": "realDonaldTrump", "count": 3, "exclude_replies": 'true', "include_rts": 'false'}
+    params = {"screen_name": "umsi", "count": 1000, "exclude_replies": 'true', "include_rts": 'false'}
     response_twitter = make_request_twitter_with_cache(
         TWITTER_BASE_URL, params)
     # print(response_twitter)
     # print('raw', response_twitter)
     try_text = format_twitter_data(response_twitter)
     # test_words = ["Germany’s largest newspaper comes out swinging against China. This is a must watch for US journalists who seem intent on doing China’s bidding.", "This is shit."]
-    # print(try_text)
+    print(try_text)
 
-    response_pd = make_request_pd_with_cache('sentiment', try_text)
-    test_format = format_pd_data(response_pd)
-    # print(response_pd)
-    print(test_format)
+    # response_pd = make_request_pd_with_cache('sentiment', try_text)
+    # test_format = format_pd_data(response_pd)
+    # # print(response_pd)
+    # print(test_format)
