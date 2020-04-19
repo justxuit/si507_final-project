@@ -16,8 +16,6 @@ import requests
 import paralleldots
 import secrets
 
-CACHE_FILENAME = "twitter_cache.json"
-CACHE_DICT = {}
 
 # KEYS
 client_key_twitter = secrets.TWITTER_API_KEY
@@ -86,7 +84,7 @@ def save_cache(api, cache_dict):
 
 def construct_unique_key(baseurl, params):
     param_strings = []
-    connector = '_'
+    connector = '|'
 
     try:  
         for key in params.keys():
@@ -94,7 +92,7 @@ def construct_unique_key(baseurl, params):
         param_strings.sort()
         unique_key = baseurl + connector + connector.join(param_strings)
     except:
-        unique_key = baseurl + connector.join(params)
+        unique_key = baseurl + connector + connector.join(params)
     return unique_key
 
 
@@ -110,7 +108,6 @@ def make_request_twitter_with_cache(baseurl, params):
         print('Using cache...')
         twitter_data = CACHEDICT_TWITTER[url]
     else:
-        print('Fetching from API. This may take a moment...')
         twitter_data = make_request_twitter(baseurl, params)
         CACHEDICT_TWITTER[url] = twitter_data
         save_cache('twitter', CACHEDICT_TWITTER)
@@ -142,55 +139,69 @@ def make_request_pd_with_cache(api, text):
         print('Using cache...')
         pd_data = CACHEDICT_PD[unique_key]
     else:
-        print('Fetching from API. This may take a moment...')
         pd_data = make_request_pd(api, text)
         CACHEDICT_PD[unique_key] = pd_data
         save_cache('pd', CACHEDICT_PD)
     return pd_data
 
 
-def format_pd_data(pd_response):
-    # pd_data_raw = {}
+def format_pd_data(pd_sentiment = {}, pd_emotion = {}, pd_abuse = {}):
     pd_data_formatted = {
         'sentiment': {},
         'emotion': {},
         'abuse': {}
     }
 
-    if ('sentiment' in pd_response):
-        pd_data_formatted['sentiment']['total'] = pd_response['sentiment']
-        positive_scores = []
-        neutral_scores = []
-        negative_scores = []
-        for result in pd_response['sentiment']:
-            positive_scores.append(result['positive'])
-            neutral_scores.append(result['neutral'])
-            negative_scores.append(result['negative'])
-        pd_data_formatted['sentiment']['positive_scores'] = positive_scores
-        pd_data_formatted['sentiment']['neutral_scores'] = neutral_scores
-        pd_data_formatted['sentiment']['negative_scores'] = negative_scores
-    # elif ('emotion' in pd_response):
-    #     happy_scores = []
-    #     excited_scores = []
-    #     angry_scores = []
-    #     sad_scores = []
-    #     fear_scores = []
-    #     bored_scores = []
-    #     for result in pd_response['emotion']:
-    #         happy_scores.append(result['Happy'])
-    #         excited_scores.append(result['Excited'])
-    #         angry_scores.append(result['Angry'])
-    #         sad_scores.append(result['Sad'])
-    #         fear_scores.append(result['Fear'])
-    #         bored_scores.append(result['Bored'])
-    #     pd_data_formatted['emotion']['happy_scores'] = happy_scores
-    #     pd_data_formatted['emotion']['excited_scores'] = excited_scores
-    #     pd_data_formatted['emotion']['angry_scores'] = angry_scores
-    #     pd_data_formatted['emotion']['sad_scores'] = sad_scores
-    #     pd_data_formatted['emotion']['fear_scores'] = fear_scores
-    #     pd_data_formatted['emotion']['bored_scores'] = bored_scores
-    else:
-        print('sentiment not found')
+    batch_size = len(pd_sentiment)
+    pd_data_formatted['sentiment']['total'] = batch_size
+    pd_data_formatted['emotion']['total'] = batch_size
+    pd_data_formatted['abuse']['total'] = batch_size
+
+    # Calculate Sentiment Data
+    positive_scores = []
+    neutral_scores = []
+    negative_scores = []
+    for result in pd_sentiment:
+        positive_scores.append(result['positive'])
+        neutral_scores.append(result['neutral'])
+        negative_scores.append(result['negative'])
+    pd_data_formatted['sentiment']['positive'] = sum(positive_scores)/batch_size
+    pd_data_formatted['sentiment']['neutral'] = sum(neutral_scores)/batch_size
+    pd_data_formatted['sentiment']['negative'] = sum(negative_scores)/batch_size
+
+
+    # Calculate Emotion Data
+    happy_scores = []
+    excited_scores = []
+    angry_scores = []
+    sad_scores = []
+    fear_scores = []
+    bored_scores = []
+    for result in pd_emotion:
+        happy_scores.append(result['Happy'])
+        excited_scores.append(result['Excited'])
+        angry_scores.append(result['Angry'])
+        sad_scores.append(result['Sad'])
+        fear_scores.append(result['Fear'])
+        bored_scores.append(result['Bored'])
+    pd_data_formatted['emotion']['happy'] = sum(happy_scores)/batch_size
+    pd_data_formatted['emotion']['excited'] = sum(excited_scores)/batch_size
+    pd_data_formatted['emotion']['angry'] = sum(angry_scores)/batch_size
+    pd_data_formatted['emotion']['sad'] = sum(sad_scores)/batch_size
+    pd_data_formatted['emotion']['fear'] = sum(fear_scores)/batch_size
+    pd_data_formatted['emotion']['bored'] = sum(bored_scores)/batch_size
+
+    # Calculate Abuse Data
+    abusive_score = []
+    hate_speech_score = []
+    neither_score = []
+    for result in pd_abuse:
+        abusive_score.append(result['abusive'])
+        hate_speech_score.append(result['hate_speech'])
+        neither_score.append(result['neither'])
+    pd_data_formatted['abuse']['abusive'] = sum(abusive_score)/batch_size
+    pd_data_formatted['abuse']['hate_speech'] = sum(hate_speech_score)/batch_size
+    pd_data_formatted['abuse']['neither'] = sum(neither_score)/batch_size
         
     return pd_data_formatted
 
@@ -201,16 +212,19 @@ def make_request_reddit():
 
 
 if __name__ == "__main__":
-    params = {"screen_name": "umsi", "count": 1000, "exclude_replies": 'true', "include_rts": 'false'}
+    params = {"screen_name": "umsi", "count": 3, "exclude_replies": 'true', "include_rts": 'false'}
     response_twitter = make_request_twitter_with_cache(
         TWITTER_BASE_URL, params)
     # print(response_twitter)
     # print('raw', response_twitter)
     try_text = format_twitter_data(response_twitter)
     # test_words = ["Germany’s largest newspaper comes out swinging against China. This is a must watch for US journalists who seem intent on doing China’s bidding.", "This is shit."]
-    print(try_text)
+    # print(try_text)
 
-    # response_pd = make_request_pd_with_cache('sentiment', try_text)
-    # test_format = format_pd_data(response_pd)
-    # # print(response_pd)
-    # print(test_format)
+    response_pd_sentiment = make_request_pd_with_cache('sentiment', try_text)['sentiment']
+    response_pd_emotion = make_request_pd_with_cache('emotion', try_text)['emotion']
+    response_pd_abuse = make_request_pd_with_cache('abuse', try_text)['abuse']
+
+    test_format = format_pd_data(response_pd_sentiment, response_pd_emotion, response_pd_abuse)
+    # print(response_pd)
+    print(test_format)
