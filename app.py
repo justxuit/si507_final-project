@@ -88,10 +88,13 @@ def construct_unique_key(baseurl, params):
     param_strings = []
     connector = '_'
 
-    for key in params.keys():
-        param_strings.append(f'{key}={params[key]}')
-    param_strings.sort()
-    unique_key = baseurl + connector + connector.join(param_strings)
+    try:  
+        for key in params.keys():
+            param_strings.append(f'{key}={params[key]}')
+        param_strings.sort()
+        unique_key = baseurl + connector + connector.join(param_strings)
+    except:
+        unique_key = baseurl + connector.join(params)
     return unique_key
 
 
@@ -102,7 +105,6 @@ def make_request_twitter(baseurl, params):
 
 def make_request_twitter_with_cache(baseurl, params):
     url = construct_unique_key(baseurl, params)
-
     # Check cache
     if url in CACHEDICT_TWITTER.keys():
         twitter_data = CACHEDICT_TWITTER[url]
@@ -113,10 +115,10 @@ def make_request_twitter_with_cache(baseurl, params):
     return twitter_data
 
 
-def format_twitter_data_for_analysis(twitter_data):
+def format_twitter_data(twitter_data):
     formatted_text = []
     for tweet in twitter_data:
-        raw_text = tweet['retweeted_status']['text']
+        raw_text = tweet['text']
         formatted_text.append(raw_text)
     return formatted_text
 
@@ -131,18 +133,80 @@ def make_request_pd(api, text):
     return response
 
 
+def make_request_pd_with_cache(api, text):
+    unique_key = construct_unique_key(api, text)
+    # Check cache
+    if unique_key in CACHEDICT_PD.keys():
+        pd_data = CACHEDICT_PD[unique_key]
+    else:
+        pd_data = make_request_pd(api, text)
+        CACHEDICT_PD[unique_key] = pd_data
+        save_cache('pd', CACHEDICT_PD)
+    return pd_data
+
+
+def format_pd_data(pd_response):
+    # pd_data_raw = {}
+    pd_data_formatted = {
+        'sentiment': {},
+        'emotion': {},
+        'abuse': {}
+    }
+
+    if ('sentiment' in pd_response):
+        pd_data_formatted['sentiment']['total'] = pd_response['sentiment']
+        positive_scores = []
+        neutral_scores = []
+        negative_scores = []
+        for result in pd_response['sentiment']:
+            positive_scores.append(result['positive'])
+            neutral_scores.append(result['neutral'])
+            negative_scores.append(result['negative'])
+        pd_data_formatted['sentiment']['positive_scores'] = positive_scores
+        pd_data_formatted['sentiment']['neutral_scores'] = neutral_scores
+        pd_data_formatted['sentiment']['negative_scores'] = negative_scores
+    # elif ('emotion' in pd_response):
+    #     happy_scores = []
+    #     excited_scores = []
+    #     angry_scores = []
+    #     sad_scores = []
+    #     fear_scores = []
+    #     bored_scores = []
+    #     for result in pd_response['emotion']:
+    #         happy_scores.append(result['Happy'])
+    #         excited_scores.append(result['Excited'])
+    #         angry_scores.append(result['Angry'])
+    #         sad_scores.append(result['Sad'])
+    #         fear_scores.append(result['Fear'])
+    #         bored_scores.append(result['Bored'])
+    #     pd_data_formatted['emotion']['happy_scores'] = happy_scores
+    #     pd_data_formatted['emotion']['excited_scores'] = excited_scores
+    #     pd_data_formatted['emotion']['angry_scores'] = angry_scores
+    #     pd_data_formatted['emotion']['sad_scores'] = sad_scores
+    #     pd_data_formatted['emotion']['fear_scores'] = fear_scores
+    #     pd_data_formatted['emotion']['bored_scores'] = bored_scores
+    else:
+        print('sentiment not found')
+        
+    return pd_data_formatted
+
+
 def make_request_reddit():
     pass
 
 
 
 if __name__ == "__main__":
-    params = {"screen_name": "realDonaldTrump", "count": 5}
+    params = {"screen_name": "realDonaldTrump", "count": 3, "exclude_replies": 'true', "include_rts": 'false'}
     response_twitter = make_request_twitter_with_cache(
         TWITTER_BASE_URL, params)
     # print(response_twitter)
-    try_text = format_twitter_data_for_analysis(response_twitter)
+    # print('raw', response_twitter)
+    try_text = format_twitter_data(response_twitter)
     # test_words = ["Germany’s largest newspaper comes out swinging against China. This is a must watch for US journalists who seem intent on doing China’s bidding.", "This is shit."]
+    # print(try_text)
 
-    response_pd = make_request_pd('sentiment', try_text)
-    print(response_pd)
+    response_pd = make_request_pd_with_cache('sentiment', try_text)
+    test_format = format_pd_data(response_pd)
+    # print(response_pd)
+    print(test_format)
