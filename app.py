@@ -14,12 +14,14 @@ from requests_oauthlib import OAuth1
 import json
 import requests
 import paralleldots
+import praw
 import secrets
 
 
 # KEYS
 client_key_twitter = secrets.TWITTER_API_KEY
 client_secret_twitter = secrets.TWITTER_API_SECRET
+client_secret_reddit = secrets.REDDIT_API_KEY
 access_token_twitter = secrets.TWITTER_ACCESS_TOKEN
 access_token_secret_twitter = secrets.TWITTER_ACCESS_TOKEN_SECRET
 pd_api_key = secrets.PARALLEL_DOTS_API_KEY
@@ -30,6 +32,14 @@ oauth_twitter = OAuth1(client_key_twitter,
                client_secret=client_secret_twitter,
                resource_owner_key=access_token_twitter,
                resource_owner_secret=access_token_secret_twitter)
+
+reddit = praw.Reddit(client_id='5tocAlGc2XQ_Eg',
+                     client_secret=client_secret_reddit,
+                     redirect_uri='http://localhost:8080',
+                     user_agent='SI 507 Final Project')
+# Enable read-only mode
+reddit.read_only = True
+
 paralleldots.set_api_key(pd_api_key)
 
 
@@ -96,6 +106,13 @@ def construct_unique_key(baseurl, params):
     return unique_key
 
 
+def construct_unique_key_reddit(username, limit):
+    connector = '|'
+    limit = str(limit)
+    unique_key = username + connector + limit
+    return unique_key
+
+
 def make_request_twitter(baseurl, params):
     response = requests.get(baseurl, params=params, auth=oauth_twitter)
     return response.json()
@@ -108,6 +125,7 @@ def make_request_twitter_with_cache(baseurl, params):
         print('Using cache...')
         twitter_data = CACHEDICT_TWITTER[url]
     else:
+        print('Fetching from API. Please wait...')
         twitter_data = make_request_twitter(baseurl, params)
         CACHEDICT_TWITTER[url] = twitter_data
         save_cache('twitter', CACHEDICT_TWITTER)
@@ -118,8 +136,35 @@ def format_twitter_data(twitter_data):
     formatted_text = []
     for tweet in twitter_data:
         raw_text = tweet['text']
-        formatted_text.append(raw_text)
+        text_list = raw_text.split(' ')
+
+        for word in text_list:
+            if 'https' in word or '@' in word:
+                text_list.remove(word)
+        scrubbed_text = ' '.join(text_list)
+        formatted_text.append(scrubbed_text)
     return formatted_text
+
+
+def make_request_reddit(username, number_of_results):
+    comments_list = []
+    comments = reddit.redditor(username).comments.new(limit=number_of_results)
+    for comment in comments:
+        comments_list.append(comment.body)
+    return comments_list
+
+
+def make_request_reddit_with_cache(username, limit):
+    unique_key = construct_unique_key_reddit(username, limit)
+    if unique_key in CACHEDICT_REDDIT.keys():
+        print('Using cache...')
+        reddit_data = CACHEDICT_REDDIT[unique_key]
+    else:
+        print('Fetching from API. Please wait...')
+        reddit_data = make_request_reddit(username, limit)
+        CACHEDICT_REDDIT[unique_key] = reddit_data
+        save_cache('reddit', CACHEDICT_REDDIT)
+    return reddit_data
 
 
 def make_request_pd(api, text):
@@ -139,22 +184,23 @@ def make_request_pd_with_cache(api, text):
         print('Using cache...')
         pd_data = CACHEDICT_PD[unique_key]
     else:
+        print('Fetching from API. Please wait...')
         pd_data = make_request_pd(api, text)
         CACHEDICT_PD[unique_key] = pd_data
         save_cache('pd', CACHEDICT_PD)
     return pd_data
 
 
-def format_pd_data(pd_sentiment = {}, pd_emotion = {}, pd_abuse = {}):
+def format_pd_data(pd_sentiment = {}, pd_abuse = {}):
     pd_data_formatted = {
         'sentiment': {},
-        'emotion': {},
+        # 'emotion': {},
         'abuse': {}
     }
 
     batch_size = len(pd_sentiment)
     pd_data_formatted['sentiment']['total'] = batch_size
-    pd_data_formatted['emotion']['total'] = batch_size
+    # pd_data_formatted['emotion']['total'] = batch_size
     pd_data_formatted['abuse']['total'] = batch_size
 
     # Calculate Sentiment Data
@@ -171,27 +217,27 @@ def format_pd_data(pd_sentiment = {}, pd_emotion = {}, pd_abuse = {}):
 
 
     # Calculate Emotion Data
-    happy_scores = []
-    excited_scores = []
-    angry_scores = []
-    sad_scores = []
-    fear_scores = []
-    bored_scores = []
-    for result in pd_emotion:
-        happy_scores.append(result['Happy'])
-        excited_scores.append(result['Excited'])
-        angry_scores.append(result['Angry'])
-        sad_scores.append(result['Sad'])
-        fear_scores.append(result['Fear'])
-        bored_scores.append(result['Bored'])
-    pd_data_formatted['emotion']['happy'] = sum(happy_scores)/batch_size
-    pd_data_formatted['emotion']['excited'] = sum(excited_scores)/batch_size
-    pd_data_formatted['emotion']['angry'] = sum(angry_scores)/batch_size
-    pd_data_formatted['emotion']['sad'] = sum(sad_scores)/batch_size
-    pd_data_formatted['emotion']['fear'] = sum(fear_scores)/batch_size
-    pd_data_formatted['emotion']['bored'] = sum(bored_scores)/batch_size
+    # happy_scores = []
+    # excited_scores = []
+    # angry_scores = []
+    # sad_scores = []
+    # fear_scores = []
+    # bored_scores = []
+    # for result in pd_emotion:
+    #     happy_scores.append(result['Happy'])
+    #     excited_scores.append(result['Excited'])
+    #     angry_scores.append(result['Angry'])
+    #     sad_scores.append(result['Sad'])
+    #     fear_scores.append(result['Fear'])
+    #     bored_scores.append(result['Bored'])
+    # pd_data_formatted['emotion']['happy'] = sum(happy_scores)/batch_size
+    # pd_data_formatted['emotion']['excited'] = sum(excited_scores)/batch_size
+    # pd_data_formatted['emotion']['angry'] = sum(angry_scores)/batch_size
+    # pd_data_formatted['emotion']['sad'] = sum(sad_scores)/batch_size
+    # pd_data_formatted['emotion']['fear'] = sum(fear_scores)/batch_size
+    # pd_data_formatted['emotion']['bored'] = sum(bored_scores)/batch_size
 
-    # Calculate Abuse Data
+    # # Calculate Abuse Data
     abusive_score = []
     hate_speech_score = []
     neither_score = []
@@ -206,25 +252,27 @@ def format_pd_data(pd_sentiment = {}, pd_emotion = {}, pd_abuse = {}):
     return pd_data_formatted
 
 
-def make_request_reddit():
-    pass
 
 
 
 if __name__ == "__main__":
-    params = {"screen_name": "umsi", "count": 3, "exclude_replies": 'true', "include_rts": 'false'}
-    response_twitter = make_request_twitter_with_cache(
-        TWITTER_BASE_URL, params)
-    # print(response_twitter)
-    # print('raw', response_twitter)
-    try_text = format_twitter_data(response_twitter)
-    # test_words = ["Germany’s largest newspaper comes out swinging against China. This is a must watch for US journalists who seem intent on doing China’s bidding.", "This is shit."]
+    CACHEDICT_TWITTER = open_cache('twitter')
+    CACHEDICT_REDDIT = open_cache('reddit')
+    CACHEDICT_PD = open_cache('pd')
+
+    # params = {"screen_name": "realDonaldTrump", "count": 100,"exclude_replies": 'true', "include_rts": 'false'}
+    # response_twitter = make_request_twitter_with_cache(TWITTER_BASE_URL, params)
+    # # print('raw', response_twitter)
+    # try_text = format_twitter_data(response_twitter)
     # print(try_text)
 
-    response_pd_sentiment = make_request_pd_with_cache('sentiment', try_text)['sentiment']
-    response_pd_emotion = make_request_pd_with_cache('emotion', try_text)['emotion']
-    response_pd_abuse = make_request_pd_with_cache('abuse', try_text)['abuse']
+    response_reddit = make_request_reddit_with_cache('thisisbillgates', 100)
+    print(response_reddit)
 
-    test_format = format_pd_data(response_pd_sentiment, response_pd_emotion, response_pd_abuse)
-    # print(response_pd)
-    print(test_format)
+    # response_pd_sentiment = make_request_pd_with_cache('sentiment', try_text)['sentiment']
+    # # response_pd_emotion = make_request_pd_with_cache('emotion', try_text)['emotion']
+    # response_pd_abuse = make_request_pd_with_cache('abuse', try_text)['abuse']
+
+    # test_format = format_pd_data(response_pd_sentiment, response_pd_abuse)
+    # # print(response_pd)
+    # print(test_format)
