@@ -56,20 +56,7 @@ CACHEDICT_REDDIT = {}
 CACHEFILE_PD = 'pd_cache.json'
 CACHEDICT_PD = {}
 
-    
 
-# def test_oauth():
-#     ''' Helper function that returns an HTTP 200 OK response code and a 
-#     representation of the requesting user if authentication was 
-#     successful; returns a 401 status code and an error message if 
-#     not. Only use this method to test if supplied user credentials are 
-#     valid. Not used to achieve the goal of this assignment.'''
-
-#     url = "https://api.twitter.com/1.1/account/verify_credentials.json"
-#     auth = OAuth1(client_key_twitter, client_secret_twitter,
-#                   access_token_twitter, access_token_secret_twitter)
-#     authentication_state = requests.get(url, auth=auth).json()
-#     return authentication_state
 
 
 def open_cache(api):
