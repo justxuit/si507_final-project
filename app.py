@@ -9,13 +9,13 @@ Final Project
 '''
 
 
-
+import secrets
 from requests_oauthlib import OAuth1
-import json
 import requests
+import json
+import sqlite3
 import paralleldots
 import praw
-import secrets
 
 
 # KEYS
@@ -109,10 +109,10 @@ def make_request_twitter_with_cache(baseurl, params):
     url = construct_unique_key(baseurl, params)
     # Check cache
     if url in CACHEDICT_TWITTER.keys():
-        print('Using cache...')
+        print('Using Twitter cache...')
         twitter_data = CACHEDICT_TWITTER[url]
     else:
-        print('Fetching from API. Please wait...')
+        print('Fetching from Twitter API. Please wait...')
         twitter_data = make_request_twitter(baseurl, params)
         CACHEDICT_TWITTER[url] = twitter_data
         save_cache('twitter', CACHEDICT_TWITTER)
@@ -144,10 +144,10 @@ def make_request_reddit(username, number_of_results):
 def make_request_reddit_with_cache(username, limit):
     unique_key = construct_unique_key_reddit(username, limit)
     if unique_key in CACHEDICT_REDDIT.keys():
-        print('Using cache...')
+        print('Using Reddit cache...')
         reddit_data = CACHEDICT_REDDIT[unique_key]
     else:
-        print('Fetching from API. Please wait...')
+        print('Fetching from Reddit API. Please wait...')
         reddit_data = make_request_reddit(username, limit)
         CACHEDICT_REDDIT[unique_key] = reddit_data
         save_cache('reddit', CACHEDICT_REDDIT)
@@ -168,10 +168,10 @@ def make_request_pd_with_cache(api, text):
     unique_key = construct_unique_key(api, text)
     # Check cache
     if unique_key in CACHEDICT_PD.keys():
-        print('Using cache...')
+        print('Using PD cache...')
         pd_data = CACHEDICT_PD[unique_key]
     else:
-        print('Fetching from API. Please wait...')
+        print('Fetching from ParallelDots API. Please wait...')
         pd_data = make_request_pd(api, text)
         CACHEDICT_PD[unique_key] = pd_data
         save_cache('pd', CACHEDICT_PD)
@@ -247,19 +247,53 @@ if __name__ == "__main__":
     CACHEDICT_REDDIT = open_cache('reddit')
     CACHEDICT_PD = open_cache('pd')
 
-    # params = {"screen_name": "realDonaldTrump", "count": 100,"exclude_replies": 'true', "include_rts": 'false'}
-    # response_twitter = make_request_twitter_with_cache(TWITTER_BASE_URL, params)
-    # # print('raw', response_twitter)
-    # try_text = format_twitter_data(response_twitter)
-    # print(try_text)
+    twitter_handle = 'realDonaldTrump'
+    reddit_handle = 'thisisbillgates'
 
-    response_reddit = make_request_reddit_with_cache('thisisbillgates', 100)
-    print(response_reddit)
+    params = {"screen_name": twitter_handle, "count": 5,"exclude_replies": 'true', "include_rts": 'false'}
+    response_twitter = make_request_twitter_with_cache(TWITTER_BASE_URL, params)
+    formatted_tweets = format_twitter_data(response_twitter)
 
-    # response_pd_sentiment = make_request_pd_with_cache('sentiment', try_text)['sentiment']
-    # # response_pd_emotion = make_request_pd_with_cache('emotion', try_text)['emotion']
-    # response_pd_abuse = make_request_pd_with_cache('abuse', try_text)['abuse']
+    pd_twitter_sentiment = make_request_pd_with_cache('sentiment', formatted_tweets)['sentiment']
+    # response_pd_emotion = make_request_pd_with_cache('emotion', try_text)['emotion']
+    pd_twitter_abuse = make_request_pd_with_cache('abuse', formatted_tweets)['abuse']
+    pd_twitter_analysis = format_pd_data(pd_twitter_sentiment, pd_twitter_abuse)
 
-    # test_format = format_pd_data(response_pd_sentiment, response_pd_abuse)
-    # # print(response_pd)
-    # print(test_format)
+    reddit_comments = make_request_reddit_with_cache(reddit_handle, 5)
+    # print(reddit_comments)
+    pd_reddit_sentiment = make_request_pd_with_cache('sentiment', reddit_comments)['sentiment']
+    pd_reddit_abuse = make_request_pd_with_cache('abuse', reddit_comments)['abuse']
+    pd_reddit_analysis = format_pd_data(pd_reddit_sentiment, pd_reddit_abuse)
+
+
+    conn = sqlite3.connect("final_project_db.db")
+    cur = conn.cursor()
+
+    twitter_comment_data = [f'{formatted_tweets}', pd_twitter_analysis['sentiment']['positive'],
+                            pd_twitter_analysis['sentiment']['negative'], pd_twitter_analysis['sentiment']['neutral'], pd_twitter_analysis['abuse']['abusive'], pd_twitter_analysis['abuse']['hate_speech'], pd_twitter_analysis['abuse']['neither'], twitter_handle, 'NULL']
+    # print(twitter_comment_data)
+
+    # reddit_comment_data = [f'{reddit_comments}', pd_reddit_analysis['sentiment']['positive'],
+    #                        pd_reddit_analysis['sentiment']['negative'], pd_reddit_analysis['sentiment']['neutral'], pd_reddit_analysis['abuse']['abusive'], pd_reddit_analysis['abuse']['hate_speech'], pd_reddit_analysis['abuse']['neither'], twitter_handle, reddit_handle]
+
+    insert_tweet = '''
+        INSERT INTO TwitterComments
+        VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    '''
+
+    # insert_reddit_comment = '''
+    #     INSERT INTO RedditComments
+    #     VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    # '''
+
+    # for row in twitter_comment_data:
+    #     cur.execute(insert_tweet, row)
+
+    cur.execute(insert_tweet, twitter_comment_data)
+    # cur.execute(insert_reddit_comment, reddit_comment_data)
+
+    conn.commit()
+    conn.close()
+
+
+
