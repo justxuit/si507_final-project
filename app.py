@@ -241,6 +241,58 @@ def format_pd_data(pd_sentiment = {}, pd_abuse = {}):
     return pd_data_formatted
 
 
+def update_twitter_table(text_data, username, associated_reddit = 'NULL'):
+    create_twittercomments = '''
+        CREATE TABLE IF NOT EXISTS "TwitterComments" (
+            "id"	INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE,
+            "tweetText"	TEXT NOT NULL,
+            "avgPositiveScore"	REAL NOT NULL,
+            "avgNegativeScore"	REAL NOT NULL,
+            "avgNeutralScore"	REAL NOT NULL,
+            "avgAbusiveScore"	REAL NOT NULL,
+            "avgHateSpeechScore"	REAL NOT NULL,
+            "avgNeitherAbuseScore"	REAL NOT NULL,
+            "authorUsername"	TEXT NOT NULL,
+            "assocRedditName"	TEXT,
+            FOREIGN KEY("assocRedditName") REFERENCES "RedditComments"("authorUsername")
+        );
+    '''
+    cur.execute(create_twittercomments)
+    conn.commit()
+    twitter_comment_data = [f'{text_data}', pd_twitter_analysis['sentiment']['positive'],
+                            pd_twitter_analysis['sentiment']['negative'], pd_twitter_analysis['sentiment']['neutral'], pd_twitter_analysis['abuse']['abusive'], pd_twitter_analysis['abuse']['hate_speech'], pd_twitter_analysis['abuse']['neither'], username, associated_reddit]
+    insert_tweet = '''
+            INSERT INTO TwitterComments
+            VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            '''
+    cur.execute(insert_tweet, twitter_comment_data)
+
+
+def update_reddit_table(text_data, username, associated_twitter = 'NULL'):
+    create_redditcomments = '''
+        CREATE TABLE IF NOT EXISTS "RedditComments" (
+            "id"	INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE,
+            "commentText"	TEXT NOT NULL,
+            "avgPositiveScore"	REAL NOT NULL,
+            "avgNegativeScore"	REAL NOT NULL,
+            "avgNeutralScore"	REAL NOT NULL,
+            "avgAbusiveScore"	REAL NOT NULL,
+            "avgHateSpeechScore"	REAL NOT NULL,
+            "avgNeitherAbuseScore"	REAL NOT NULL,
+            "authorUsername"	TEXT NOT NULL,
+            "assocTwitterName"	TEXT,
+            FOREIGN KEY("assocTwitterName") REFERENCES "TwitterComments"("authorUsername")
+        );
+    '''
+    cur.execute(create_redditcomments)
+    conn.commit()
+    reddit_comment_data = [f'{text_data}', pd_reddit_analysis['sentiment']['positive'],
+                           pd_reddit_analysis['sentiment']['negative'], pd_reddit_analysis['sentiment']['neutral'], pd_reddit_analysis['abuse']['abusive'], pd_reddit_analysis['abuse']['hate_speech'], pd_reddit_analysis['abuse']['neither'], username, associated_twitter]
+    insert_reddit_comment = '''
+            INSERT INTO RedditComments
+            VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            '''
+    cur.execute(insert_reddit_comment, reddit_comment_data)
 
 
 
@@ -249,15 +301,14 @@ if __name__ == "__main__":
     CACHEDICT_REDDIT = open_cache('reddit')
     CACHEDICT_PD = open_cache('pd')
 
-    twitter_handle = 'NULL'
-    reddit_handle = 'NULL'
-
     while True:
-        user_input = input("Which social media platform do you want to use? Enter 'Twitter' or 'Reddit': ").lower()
+        twitter_handle = 'NULL'
+        reddit_handle = 'NULL'
+
+        user_input = input("Which social media platform do you want to explore? Enter 'Twitter', 'Reddit', or 'Both', or enter 'exit' to exit: ").lower()
 
         if (user_input == 'twitter'):
             twitter_handle = input("Please enter Twitter username to look up: ")
-
             # Twitter Data
             response_twitter = make_request_twitter_with_cache(TWITTER_BASE_URL, twitter_handle)
             formatted_tweets = format_twitter_data(response_twitter)
@@ -268,88 +319,49 @@ if __name__ == "__main__":
 
         elif (user_input == 'reddit'):
             reddit_handle = input("Please enter Reddit username to look up: ")
-
             # Reddit Data
             reddit_comments = make_request_reddit_with_cache(reddit_handle, 10)
             # print(reddit_comments)
             pd_reddit_sentiment = make_request_pd_with_cache('sentiment', reddit_comments)['sentiment']
             pd_reddit_abuse = make_request_pd_with_cache('abuse', reddit_comments)['abuse']
             pd_reddit_analysis = format_pd_data(pd_reddit_sentiment, pd_reddit_abuse)
+        elif (user_input == 'both'):
+            twitter_handle = input("Please enter Twitter username to look up: ")
+            reddit_handle = input("Please enter Reddit username to look up: ")
+
+            response_twitter = make_request_twitter_with_cache(TWITTER_BASE_URL, twitter_handle)
+            formatted_tweets = format_twitter_data(response_twitter)
+            pd_twitter_sentiment = make_request_pd_with_cache(
+                'sentiment', formatted_tweets)['sentiment']
+            pd_twitter_abuse = make_request_pd_with_cache(
+                'abuse', formatted_tweets)['abuse']
+            pd_twitter_analysis = format_pd_data(
+                pd_twitter_sentiment, pd_twitter_abuse)
+
+            reddit_comments = make_request_reddit_with_cache(reddit_handle, 10)
+            pd_reddit_sentiment = make_request_pd_with_cache(
+                'sentiment', reddit_comments)['sentiment']
+            pd_reddit_abuse = make_request_pd_with_cache(
+                'abuse', reddit_comments)['abuse']
+            pd_reddit_analysis = format_pd_data(
+                pd_reddit_sentiment, pd_reddit_abuse)
         elif (user_input == 'exit'):
             break
+        else:
+            print("Please enter a valid command.")
 
 
         conn = sqlite3.connect("final_project.db")
         cur = conn.cursor()
 
         if (user_input == 'twitter'):
-            # drop_twittercomments = '''
-            # DROP TABLE IF EXISTS "TwitterComments";
-            # '''
-
-            create_twittercomments = '''
-                CREATE TABLE IF NOT EXISTS "TwitterComments" (
-                    "id"	INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE,
-                    "tweetText"	BLOB NOT NULL UNIQUE,
-                    "avgPositiveScore"	REAL NOT NULL,
-                    "avgNegativeScore"	REAL NOT NULL,
-                    "avgNeutralScore"	REAL NOT NULL,
-                    "avgAbusiveScore"	REAL NOT NULL,
-                    "avgHateSpeechScore"	REAL NOT NULL,
-                    "avgNeitherAbuseScore"	REAL NOT NULL,
-                    "authorUsername"	TEXT NOT NULL,
-                    "assocRedditName"	TEXT,
-                    FOREIGN KEY("assocRedditName") REFERENCES "RedditComments"("authorUsername")
-                );
-            '''
-
-            # cur.execute(drop_twittercomments)
-            cur.execute(create_twittercomments)
-            conn.commit()
-
-            twitter_comment_data = [f'{formatted_tweets}', pd_twitter_analysis['sentiment']['positive'],
-                                    pd_twitter_analysis['sentiment']['negative'], pd_twitter_analysis['sentiment']['neutral'], pd_twitter_analysis['abuse']['abusive'], pd_twitter_analysis['abuse']['hate_speech'], pd_twitter_analysis['abuse']['neither'], twitter_handle, reddit_handle]
-        
-            insert_tweet = '''
-            INSERT INTO TwitterComments
-            VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            '''
-
-            cur.execute(insert_tweet, twitter_comment_data)
-        
+            update_twitter_table(formatted_tweets, twitter_handle)
         elif (user_input == 'reddit'):
-            # drop_redditcomments = '''
-            #     DROP TABLE IF EXISTS 'RedditComments'
-            # '''
+            update_reddit_table(reddit_comments, reddit_handle)
+        elif (user_input == 'both'):
+            update_twitter_table(formatted_tweets, twitter_handle, reddit_handle)
+            update_reddit_table(reddit_comments, reddit_handle, twitter_handle)
 
-            create_redditcomments = '''
-                CREATE TABLE IF NOT EXISTS "RedditComments" (
-                    "id"	INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE,
-                    "commentText"	TEXT NOT NULL UNIQUE,
-                    "avgPositiveScore"	REAL NOT NULL,
-                    "avgNegativeScore"	REAL NOT NULL,
-                    "avgNeutralScore"	REAL NOT NULL,
-                    "avgAbusiveScore"	REAL NOT NULL,
-                    "avgHateSpeechScore"	REAL NOT NULL,
-                    "avgNeitherAbuseScore"	REAL NOT NULL,
-                    "authorUsername"	TEXT NOT NULL,
-                    "assocTwitterName"	TEXT,
-                    FOREIGN KEY("assocTwitterName") REFERENCES "TwitterComments"("authorUsername")
-                );
-            '''
-
-            # cur.execute(drop_redditcomments)
-            cur.execute(create_redditcomments)
-            conn.commit()
-
-            reddit_comment_data = [f'{reddit_comments}', pd_reddit_analysis['sentiment']['positive'],
-                                   pd_reddit_analysis['sentiment']['negative'], pd_reddit_analysis['sentiment']['neutral'], pd_reddit_analysis['abuse']['abusive'], pd_reddit_analysis['abuse']['hate_speech'], pd_reddit_analysis['abuse']['neither'], reddit_handle, twitter_handle]
-
-            insert_reddit_comment = '''
-            INSERT INTO RedditComments
-            VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            '''
-            cur.execute(insert_reddit_comment, reddit_comment_data)
 
         conn.commit()
         conn.close()
