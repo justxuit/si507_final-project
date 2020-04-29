@@ -313,12 +313,18 @@ if __name__ == "__main__":
         if (user_input == 'twitter'):
             twitter_handle = input("Please enter Twitter username to look up: ").lower()
             # Twitter Data
-            response_twitter = make_request_twitter_with_cache(TWITTER_BASE_URL, twitter_handle)
-            formatted_tweets = format_twitter_data(response_twitter)
-            # PD Data
-            pd_twitter_sentiment = make_request_pd_with_cache('sentiment', formatted_tweets)['sentiment']
-            pd_twitter_abuse = make_request_pd_with_cache('abuse', formatted_tweets)['abuse']
-            pd_twitter_analysis = format_pd_data(pd_twitter_sentiment, pd_twitter_abuse)
+            try:
+                response_twitter = make_request_twitter_with_cache(TWITTER_BASE_URL, twitter_handle)
+                formatted_tweets = format_twitter_data(response_twitter)
+                # PD Data
+                pd_twitter_sentiment = make_request_pd_with_cache(
+                    'sentiment', formatted_tweets)['sentiment']
+                pd_twitter_abuse = make_request_pd_with_cache(
+                'abuse', formatted_tweets)['abuse']
+                pd_twitter_analysis = format_pd_data(
+                pd_twitter_sentiment, pd_twitter_abuse)
+            except:
+                print("No data for that user was found. Please try another username.")
 
         elif (user_input == 'reddit'):
             reddit_handle = input(
@@ -377,38 +383,51 @@ if __name__ == "__main__":
             'Abusive', 
             'Hate Speech'
             ]
-        sentiment_values_twitter = [
-            pd_twitter_analysis['sentiment']['positive'], 
-            pd_twitter_analysis['sentiment']['negative'], 
-            pd_twitter_analysis['sentiment']['neutral'], 
-            pd_twitter_analysis['abuse']['abusive'], 
-            pd_twitter_analysis['abuse']['hate_speech']
-            ]
-
-        sentiment_values_reddit = [
-            pd_reddit_analysis['sentiment']['positive'],
-            pd_reddit_analysis['sentiment']['negative'], 
-            pd_reddit_analysis['sentiment']['neutral'], 
-            pd_reddit_analysis['abuse']['abusive'], 
-            pd_reddit_analysis['abuse']['hate_speech']
-            ]
 
         graph_username = ''
         if (user_input == 'twitter'):
             graph_username = twitter_handle.upper()
-            semantic_data = go.Bar(x=sentiment_categories, y=sentiment_values_twitter)
+            sentiment_values = [
+                pd_twitter_analysis['sentiment']['positive'],
+                pd_twitter_analysis['sentiment']['negative'],
+                pd_twitter_analysis['sentiment']['neutral'],
+                pd_twitter_analysis['abuse']['abusive'],
+                pd_twitter_analysis['abuse']['hate_speech']
+            ]
+            semantic_data = go.Bar(x=sentiment_categories, y=sentiment_values)
             semantic_layout = go.Layout(title=f"Twitter Semantic Analysis for: {graph_username}")
             fig = go.Figure(
                 data=semantic_data, layout=semantic_layout)
             fig.show()
         elif (user_input == 'reddit'):
             graph_username = reddit_handle.upper()
-            semantic_data = go.Bar(x=sentiment_categories, y=sentiment_values_reddit)
+            sentiment_values = [
+                pd_reddit_analysis['sentiment']['positive'],
+                pd_reddit_analysis['sentiment']['negative'],
+                pd_reddit_analysis['sentiment']['neutral'],
+                pd_reddit_analysis['abuse']['abusive'],
+                pd_reddit_analysis['abuse']['hate_speech']
+            ]
+            semantic_data = go.Bar(x=sentiment_categories, y=sentiment_values)
             semantic_layout = go.Layout(title=f"Reddit Semantic Analysis for: {graph_username}")
             fig = go.Figure(
                 data=semantic_data, layout=semantic_layout)
             fig.show()
         elif (user_input == 'both'):
+            sentiment_values_twitter = [
+                pd_twitter_analysis['sentiment']['positive'],
+                pd_twitter_analysis['sentiment']['negative'],
+                pd_twitter_analysis['sentiment']['neutral'],
+                pd_twitter_analysis['abuse']['abusive'],
+                pd_twitter_analysis['abuse']['hate_speech']
+            ]
+            sentiment_values_reddit = [
+                pd_reddit_analysis['sentiment']['positive'],
+                pd_reddit_analysis['sentiment']['negative'],
+                pd_reddit_analysis['sentiment']['neutral'],
+                pd_reddit_analysis['abuse']['abusive'],
+                pd_reddit_analysis['abuse']['hate_speech']
+            ]
             semantic_data = [go.Bar(name='Twitter', x=sentiment_categories, y=sentiment_values_twitter), go.Bar(name='Reddit', x=sentiment_categories, y=sentiment_values_reddit)]
             semantic_layout = go.Layout(
                 title=f"Reddit & Twitter Semantic Analysis for: {twitter_handle.upper()} / {reddit_handle.upper()}")
