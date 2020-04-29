@@ -105,7 +105,9 @@ def make_request_twitter(baseurl, params):
     return response.json()
 
 
-def make_request_twitter_with_cache(baseurl, params):
+def make_request_twitter_with_cache(baseurl, username):
+    params = {"screen_name": username, "count": 10,
+              "exclude_replies": 'true', "include_rts": 'false'}
     url = construct_unique_key(baseurl, params)
     # Check cache
     if url in CACHEDICT_TWITTER.keys():
@@ -195,43 +197,43 @@ def format_pd_data(pd_sentiment = {}, pd_abuse = {}):
     neutral_scores = []
     negative_scores = []
     for result in pd_sentiment:
-        positive_scores.append(result['positive'])
-        neutral_scores.append(result['neutral'])
-        negative_scores.append(result['negative'])
+        try:
+            positive_scores.append(result['positive'])
+        except:
+            positive_scores.append(0)
+        
+        try:
+            neutral_scores.append(result['neutral'])
+        except:
+            neutral_scores.append(0)
+
+        try:
+            negative_scores.append(result['negative'])
+        except:
+            negative_scores.append(0)
     pd_data_formatted['sentiment']['positive'] = sum(positive_scores)/batch_size
     pd_data_formatted['sentiment']['neutral'] = sum(neutral_scores)/batch_size
     pd_data_formatted['sentiment']['negative'] = sum(negative_scores)/batch_size
-
-
-    # Calculate Emotion Data
-    # happy_scores = []
-    # excited_scores = []
-    # angry_scores = []
-    # sad_scores = []
-    # fear_scores = []
-    # bored_scores = []
-    # for result in pd_emotion:
-    #     happy_scores.append(result['Happy'])
-    #     excited_scores.append(result['Excited'])
-    #     angry_scores.append(result['Angry'])
-    #     sad_scores.append(result['Sad'])
-    #     fear_scores.append(result['Fear'])
-    #     bored_scores.append(result['Bored'])
-    # pd_data_formatted['emotion']['happy'] = sum(happy_scores)/batch_size
-    # pd_data_formatted['emotion']['excited'] = sum(excited_scores)/batch_size
-    # pd_data_formatted['emotion']['angry'] = sum(angry_scores)/batch_size
-    # pd_data_formatted['emotion']['sad'] = sum(sad_scores)/batch_size
-    # pd_data_formatted['emotion']['fear'] = sum(fear_scores)/batch_size
-    # pd_data_formatted['emotion']['bored'] = sum(bored_scores)/batch_size
 
     # # Calculate Abuse Data
     abusive_score = []
     hate_speech_score = []
     neither_score = []
     for result in pd_abuse:
-        abusive_score.append(result['abusive'])
-        hate_speech_score.append(result['hate_speech'])
-        neither_score.append(result['neither'])
+        try:
+            abusive_score.append(result['abusive'])
+        except:
+            abusive_score.append(0)
+
+        try:
+            hate_speech_score.append(result['hate_speech'])
+        except:
+            hate_speech_score.append(0)
+
+        try:
+            neither_score.append(result['neither'])
+        except:
+            neither_score.append(0)
     pd_data_formatted['abuse']['abusive'] = sum(abusive_score)/batch_size
     pd_data_formatted['abuse']['hate_speech'] = sum(hate_speech_score)/batch_size
     pd_data_formatted['abuse']['neither'] = sum(neither_score)/batch_size
@@ -247,53 +249,110 @@ if __name__ == "__main__":
     CACHEDICT_REDDIT = open_cache('reddit')
     CACHEDICT_PD = open_cache('pd')
 
-    twitter_handle = 'realDonaldTrump'
-    reddit_handle = 'thisisbillgates'
+    twitter_handle = 'NULL'
+    reddit_handle = 'NULL'
 
-    params = {"screen_name": twitter_handle, "count": 5,"exclude_replies": 'true', "include_rts": 'false'}
-    response_twitter = make_request_twitter_with_cache(TWITTER_BASE_URL, params)
-    formatted_tweets = format_twitter_data(response_twitter)
+    while True:
+        user_input = input("Which social media platform do you want to use? Enter 'Twitter' or 'Reddit': ").lower()
 
-    pd_twitter_sentiment = make_request_pd_with_cache('sentiment', formatted_tweets)['sentiment']
-    # response_pd_emotion = make_request_pd_with_cache('emotion', try_text)['emotion']
-    pd_twitter_abuse = make_request_pd_with_cache('abuse', formatted_tweets)['abuse']
-    pd_twitter_analysis = format_pd_data(pd_twitter_sentiment, pd_twitter_abuse)
+        if (user_input == 'twitter'):
+            twitter_handle = input("Please enter Twitter username to look up: ")
 
-    reddit_comments = make_request_reddit_with_cache(reddit_handle, 5)
-    # print(reddit_comments)
-    pd_reddit_sentiment = make_request_pd_with_cache('sentiment', reddit_comments)['sentiment']
-    pd_reddit_abuse = make_request_pd_with_cache('abuse', reddit_comments)['abuse']
-    pd_reddit_analysis = format_pd_data(pd_reddit_sentiment, pd_reddit_abuse)
+            # Twitter Data
+            response_twitter = make_request_twitter_with_cache(TWITTER_BASE_URL, twitter_handle)
+            formatted_tweets = format_twitter_data(response_twitter)
+            # PD Data
+            pd_twitter_sentiment = make_request_pd_with_cache('sentiment', formatted_tweets)['sentiment']
+            pd_twitter_abuse = make_request_pd_with_cache('abuse', formatted_tweets)['abuse']
+            pd_twitter_analysis = format_pd_data(pd_twitter_sentiment, pd_twitter_abuse)
+
+        elif (user_input == 'reddit'):
+            reddit_handle = input("Please enter Reddit username to look up: ")
+
+            # Reddit Data
+            reddit_comments = make_request_reddit_with_cache(reddit_handle, 10)
+            # print(reddit_comments)
+            pd_reddit_sentiment = make_request_pd_with_cache('sentiment', reddit_comments)['sentiment']
+            pd_reddit_abuse = make_request_pd_with_cache('abuse', reddit_comments)['abuse']
+            pd_reddit_analysis = format_pd_data(pd_reddit_sentiment, pd_reddit_abuse)
+        elif (user_input == 'exit'):
+            break
 
 
-    conn = sqlite3.connect("final_project_db.db")
-    cur = conn.cursor()
+        conn = sqlite3.connect("final_project.db")
+        cur = conn.cursor()
 
-    twitter_comment_data = [f'{formatted_tweets}', pd_twitter_analysis['sentiment']['positive'],
-                            pd_twitter_analysis['sentiment']['negative'], pd_twitter_analysis['sentiment']['neutral'], pd_twitter_analysis['abuse']['abusive'], pd_twitter_analysis['abuse']['hate_speech'], pd_twitter_analysis['abuse']['neither'], twitter_handle, 'NULL']
-    # print(twitter_comment_data)
+        if (user_input == 'twitter'):
+            # drop_twittercomments = '''
+            # DROP TABLE IF EXISTS "TwitterComments";
+            # '''
 
-    # reddit_comment_data = [f'{reddit_comments}', pd_reddit_analysis['sentiment']['positive'],
-    #                        pd_reddit_analysis['sentiment']['negative'], pd_reddit_analysis['sentiment']['neutral'], pd_reddit_analysis['abuse']['abusive'], pd_reddit_analysis['abuse']['hate_speech'], pd_reddit_analysis['abuse']['neither'], twitter_handle, reddit_handle]
+            create_twittercomments = '''
+                CREATE TABLE IF NOT EXISTS "TwitterComments" (
+                    "id"	INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE,
+                    "tweetText"	BLOB NOT NULL UNIQUE,
+                    "avgPositiveScore"	REAL NOT NULL,
+                    "avgNegativeScore"	REAL NOT NULL,
+                    "avgNeutralScore"	REAL NOT NULL,
+                    "avgAbusiveScore"	REAL NOT NULL,
+                    "avgHateSpeechScore"	REAL NOT NULL,
+                    "avgNeitherAbuseScore"	REAL NOT NULL,
+                    "authorUsername"	TEXT NOT NULL,
+                    "assocRedditName"	TEXT,
+                    FOREIGN KEY("assocRedditName") REFERENCES "RedditComments"("authorUsername")
+                );
+            '''
 
-    insert_tweet = '''
-        INSERT INTO TwitterComments
-        VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    '''
+            # cur.execute(drop_twittercomments)
+            cur.execute(create_twittercomments)
+            conn.commit()
 
-    # insert_reddit_comment = '''
-    #     INSERT INTO RedditComments
-    #     VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    # '''
+            twitter_comment_data = [f'{formatted_tweets}', pd_twitter_analysis['sentiment']['positive'],
+                                    pd_twitter_analysis['sentiment']['negative'], pd_twitter_analysis['sentiment']['neutral'], pd_twitter_analysis['abuse']['abusive'], pd_twitter_analysis['abuse']['hate_speech'], pd_twitter_analysis['abuse']['neither'], twitter_handle, reddit_handle]
+        
+            insert_tweet = '''
+            INSERT INTO TwitterComments
+            VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            '''
 
-    # for row in twitter_comment_data:
-    #     cur.execute(insert_tweet, row)
+            cur.execute(insert_tweet, twitter_comment_data)
+        
+        elif (user_input == 'reddit'):
+            # drop_redditcomments = '''
+            #     DROP TABLE IF EXISTS 'RedditComments'
+            # '''
 
-    cur.execute(insert_tweet, twitter_comment_data)
-    # cur.execute(insert_reddit_comment, reddit_comment_data)
+            create_redditcomments = '''
+                CREATE TABLE IF NOT EXISTS "RedditComments" (
+                    "id"	INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE,
+                    "commentText"	TEXT NOT NULL UNIQUE,
+                    "avgPositiveScore"	REAL NOT NULL,
+                    "avgNegativeScore"	REAL NOT NULL,
+                    "avgNeutralScore"	REAL NOT NULL,
+                    "avgAbusiveScore"	REAL NOT NULL,
+                    "avgHateSpeechScore"	REAL NOT NULL,
+                    "avgNeitherAbuseScore"	REAL NOT NULL,
+                    "authorUsername"	TEXT NOT NULL,
+                    "assocTwitterName"	TEXT,
+                    FOREIGN KEY("assocTwitterName") REFERENCES "TwitterComments"("authorUsername")
+                );
+            '''
 
-    conn.commit()
-    conn.close()
+            # cur.execute(drop_redditcomments)
+            cur.execute(create_redditcomments)
+            conn.commit()
+
+            reddit_comment_data = [f'{reddit_comments}', pd_reddit_analysis['sentiment']['positive'],
+                                   pd_reddit_analysis['sentiment']['negative'], pd_reddit_analysis['sentiment']['neutral'], pd_reddit_analysis['abuse']['abusive'], pd_reddit_analysis['abuse']['hate_speech'], pd_reddit_analysis['abuse']['neither'], reddit_handle, twitter_handle]
+
+            insert_reddit_comment = '''
+            INSERT INTO RedditComments
+            VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            '''
+            cur.execute(insert_reddit_comment, reddit_comment_data)
+
+        conn.commit()
+        conn.close()
 
 
 
