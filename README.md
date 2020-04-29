@@ -21,3 +21,7 @@
 - paralleldots
 - praw
 - plotly
+
+## Usage
+
+First, enter the specific social media platform you would like to use for lookups — i.e. choice of Twitter, Reddit, or both. Next, enter the username(s) for the lookup. Once the necessary information is inputted, a data page will be presented to the user with graphical breakdowns of semantic data for text comments/tweets for the username provided.
