@@ -311,7 +311,7 @@ if __name__ == "__main__":
         user_input = input("Which social media platform do you want to explore? Enter 'Twitter', 'Reddit', or 'Both', or enter 'exit' to exit: ").lower()
 
         if (user_input == 'twitter'):
-            twitter_handle = input("Please enter Twitter username to look up: ").lower()
+            twitter_handle = input("Please enter Twitter username to look up: ")
             # Twitter Data
             try:
                 response_twitter = make_request_twitter_with_cache(TWITTER_BASE_URL, twitter_handle)
